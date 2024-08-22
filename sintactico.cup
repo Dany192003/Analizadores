@@ -1,0 +1,132 @@
+package logica;
+
+import java_cup.runtime.Symbol;
+import java.util.LinkedList;
+import java.util.List;
+import ast.instrucciones.CrearConjunto;
+import ast.interfaces.Expresion;
+import ast.interfaces.Instruccion;
+import ast.expresiones.Primitivo;
+import ast.expresiones.TipoDato;
+import ast.expresiones.ValoresConjunto;
+// Definición de la gramática
+parser code {:
+    
+    public LinkedList<Errores> listaErrores = new LinkedList<>();
+    public LinkedList<Instruccion> AST = new LinkedList<>();
+
+    // Manejo de errores sintácticos recuperables
+    public void syntax_error(Symbol s) {
+        listaErrores.add(new Errores(
+            "Sintáctico Recuperable",
+            "No se esperaba el componente: " + s.value,
+            s.left + 1,
+            s.right + 1
+        ));
+    }
+
+    // Manejo de errores sintácticos no recuperables
+    public void unrecovered_syntax_error(Symbol s) {
+        listaErrores.add(new Errores(
+            "Sintáctico No Recuperable",
+            "No se esperaba el componente: " + s.value,
+            s.left + 1,
+            s.right + 1
+        ));
+    }
+    
+    public LinkedList<Instruccion> getAST() {
+        return AST;
+    }
+:}
+
+// Declaración de terminales
+terminal FLECHA;
+terminal COMA;
+terminal LLAVE_IZQ;
+terminal LLAVE_DER;
+terminal TILDE_INVERTIDA;
+terminal FIN_CADENA;
+terminal DOS_PUNTOS;
+terminal PAREN_IZQ;
+terminal PAREN_DER;
+terminal UNION;
+terminal INTERSECCION;
+terminal COMPLEMENTO;
+terminal DIFERENCIA;
+terminal LETRAS;
+terminal IDENTIFICADOR;
+terminal NUMERO;
+terminal CONJ;
+terminal OPERA;
+terminal EVALUAR;
+
+// Declaración de no terminales
+non terminal Bloque;
+non terminal Contenidos;
+non terminal Contenido;
+non terminal Conjunto;
+non terminal Evaluacion;
+non terminal ListaElementos;
+non terminal Elemento;
+non terminal Operacion;
+non terminal OperacionDetalles;
+non terminal ConjuntoDet;
+non terminal RefConjuntos;
+non terminal RefConjunto;
+non terminal Operador;
+non terminal CombinacionOperaciones;
+
+// La regla inicial debe ser la que corresponde al punto de entrada del análisis
+start with Bloque;
+
+// Definiciones de reglas
+Bloque ::= LLAVE_IZQ Contenidos:a LLAVE_DER {: parser.AST = (LinkedList<Instruccion>) a; :}
+;
+
+Contenidos
+    ::= Contenidos:a Contenido:b {: 
+        // Aseguramos que 'a' es una LinkedList
+        LinkedList<Instruccion> lista = (LinkedList<Instruccion>) a;
+        lista.add((Instruccion) b);
+        RESULT = lista;
+    :}
+    | Contenido:a {: 
+        // Creamos una nueva lista si solo hay un Contenido
+        LinkedList<Instruccion> lista = new LinkedList<>();
+        lista.add((Instruccion) a);
+        RESULT = lista;
+    :}
+    ;
+
+Contenido
+    ::= Conjunto:a  {:RESULT=a;:}
+    | error 
+    ;
+
+Conjunto
+    ::= CONJ DOS_PUNTOS IDENTIFICADOR:a FLECHA ConjuntoDet:b FIN_CADENA {:RESULT=new CrearConjunto(a.toString(),(ValoresConjunto)b);:}
+    ;
+
+ConjuntoDet
+    ::= ListaElementos:a                           {:RESULT= new ValoresConjunto((List<Primitivo>)a,null,null);:}
+    | Elemento:a TILDE_INVERTIDA Elemento:b        {:RESULT= new ValoresConjunto(null,(Primitivo)a,(Primitivo)b);:}
+    ;
+
+ListaElementos
+    ::= ListaElementos:a COMA Elemento:b  {: 
+
+        ((LinkedList<Expresion>) a).add((Expresion) b);
+        RESULT = a;
+    :}
+    | Elemento:a  {: 
+        
+        LinkedList<Expresion> lista = new LinkedList<>();
+        lista.add((Expresion) a);
+        RESULT = lista;
+    :}
+    ;
+Elemento
+    ::= NUMERO:a  {:RESULT=new Primitivo(a, TipoDato.Numero);:}
+    | LETRAS:a    {:RESULT=new Primitivo(a.toString(), TipoDato.Letra);:}
+    ;
